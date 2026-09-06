@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Air Write - draw in the air with your finger and watch it appear live on screen, by Ayushi Shukla">
+    <meta name="keywords" content="Air Writing, Hand Tracking, MediaPipe, AI, Interactive, Draw in Air">
+    <title>✍️ Air Write - By Ayushi Shukla</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .creator {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            .container {
+                padding: 1.5rem;
+            }
+        }
+
+        .video-section, .draw-section {
+            position: relative;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            transform: scaleX(-1);
+        }
+
+        .draw-section {
+            background: #0e0e16;
+        }
+
+        #inkCanvas, #cursorCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #inkCanvas {
+            z-index: 1;
+        }
+
+        #cursorCanvas {
+            z-index: 2;
+        }
+
+        .video-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 3;
+        }
+
+        .controls {
+            margin-top: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        button {
+            padding: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: white;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.95rem;
+            opacity: 0.9;
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .status.error {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.2);
+        }
+
+        .status.success {
+            color: #51cf66;
+            background: rgba(81, 207, 102, 0.2);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #51cf66;
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-label {
+            opacity: 0.8;
+            font-size: 0.85rem;
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-top: 2rem;
+            border-left: 4px solid #51cf66;
+        }
+
+        .instructions h3 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding-left: 0;
+            columns: 2;
+            column-gap: 2rem;
+        }
+
+        .instructions li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            break-inside: avoid;
+        }
+
+        .instructions li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #51cf66;
+            font-weight: bold;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .footer a {
+            color: #fff;
+            text-decoration: none;
+            transition: opacity 0.3s;
+        }
+
+        .footer a:hover {
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>✍️ Air Write</h1>
+            <p>Pinch your fingers in the air to write — it appears live on the screen next to you</p>
+            <p class="creator">By Ayushi Shukla | GSSoC 2026 Contributor</p>
+        </div>
+
+        <div class="content">
+            <div class="video-section">
+                <div class="video-label">📹 Your Camera</div>
+                <video id="video"></video>
+            </div>
+
+            <div class="draw-section">
+                <div class="video-label">🖊️ Your Canvas</div>
+                <canvas id="inkCanvas"></canvas>
+                <canvas id="cursorCanvas"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" onclick="startCamera()">📷 Start Camera</button>
+            <button id="stopBtn" onclick="stopCamera()">⏹️ Stop Camera</button>
+            <button id="clearBtn" onclick="clearCanvas()">🗑️ Clear Canvas</button>
+            <button id="colorBtn" onclick="changeColor()">🎨 Change Color</button>
+            <button id="undoBtn" onclick="undoStroke()">↩️ Undo</button>
+        </div>
+
+        <div class="status" id="status">🔴 Click Start Camera to begin</div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-value" id="handCount">0</div>
+                <div class="stat-label">Hand Detected</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="fps">0</div>
+                <div class="stat-label">FPS</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="penState">✋ Up</div>
+                <div class="stat-label">Pen State</div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>💡 How to Use:</h3>
+            <ul>
+                <li>Click "Start Camera" to begin</li>
+                <li>Pinch thumb + index finger together = pen down</li>
+                <li>Move your pinched hand in the air to write</li>
+                <li>Open your hand = pen up (move without drawing)</li>
+                <li>Make a fist = clear the whole canvas</li>
+                <li>"Change Color" cycles through pen colors</li>
+                <li>"Undo" removes your last stroke</li>
+                <li>Good lighting helps hand detection</li>
+                <li>Your camera data stays on your device</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>✍️ Air Write v1.0 | <a href="https://github.com/ayushishuklaME" target="_blank">GitHub</a> | <a href="https://linkedin.com/in/ayushishuklame" target="_blank">LinkedIn</a></p>
+            <p>Made with ❤️ using MediaPipe Hand Landmarker &amp; Canvas API</p>
+        </div>
+    </div>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14"></script>
+
+    <script>
+        const video = document.getElementById('video');
+        const inkCanvas = document.getElementById('inkCanvas');
+        const cursorCanvas = document.getElementById('cursorCanvas');
+        const inkCtx = inkCanvas.getContext('2d');
+        const cursorCtx = cursorCanvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        const handCountDiv = document.getElementById('handCount');
+        const fpsDiv = document.getElementById('fps');
+        const penStateDiv = document.getElementById('penState');
+
+        function resizeCanvases() {
+            [inkCanvas, cursorCanvas].forEach(c => {
+                c.width = c.offsetWidth;
+                c.height = c.offsetHeight;
+            });
+            redrawAll();
+        }
+        window.addEventListener('resize', resizeCanvases);
+
+        let stream = null;
+        let handLandmarker;
+        let lastFrameTime = Date.now();
+        let frameCount = 0;
+
+        const colors = ['#FF3B30', '#34C759', '#0A84FF', '#FFD60A', '#AF52DE', '#FFFFFF'];
+        let colorIndex = 0;
+        let currentColor = colors[0];
+
+        let strokes = [];       // finished + in-progress strokes: { color, points: [{x,y}] }
+        let currentStroke = null;
+        let isPinching = false;
+        let wasFist = false;
+        let lastPoint = null;
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                video.srcObject = stream;
+                await new Promise(resolve => { video.onloadedmetadata = resolve; });
+                video.play();
+                statusDiv.textContent = '🟢 Camera active - pinch to start writing!';
+                statusDiv.className = 'status success';
+                initializeHandTracking();
+            } catch (err) {
+                statusDiv.textContent = '🔴 Camera access denied or unavailable';
+                statusDiv.className = 'status error';
+                console.error(err);
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            statusDiv.textContent = '🔴 Camera stopped';
+            statusDiv.className = 'status error';
+            cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+        }
+
+        async function initializeHandTracking() {
+            const vision = window;
+            const HandLandmarker = vision.HandLandmarker;
+            const FilesetResolver = vision.FilesetResolver;
+
+            try {
+                const wasmBase = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+                const filesetResolver = await FilesetResolver.forVisionTasks(wasmBase);
+
+                handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                        delegate: "GPU"
+                    },
+                    numHands: 1,
+                    runningMode: "VIDEO"
+                });
+
+                detectHands();
+            } catch (err) {
+                console.error('Hand tracking init error:', err);
+                setTimeout(initializeHandTracking, 1000);
+            }
+        }
+
+        function dist(a, b) {
+            return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+        }
+
+        async function detectHands() {
+            if (!handLandmarker || !video.srcObject) return;
+
+            try {
+                const results = handLandmarker.detectForVideo(video, performance.now());
+                cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+
+                const hasHand = results.landmarks && results.landmarks.length > 0;
+                handCountDiv.textContent = hasHand ? 1 : 0;
+
+                if (hasHand) {
+                    const landmarks = results.landmarks[0];
+                    const thumbTip = landmarks[4];
+                    const indexTip = landmarks[8];
+                    const palm = landmarks[0];
+
+                    const pinchDist = dist(thumbTip, indexTip);
+                    const pinching = pinchDist < 0.06;
+
+                    const fingerTips = [landmarks[4], landmarks[8], landmarks[12], landmarks[16], landmarks[20]];
+                    const distances = fingerTips.map(tip => dist(tip, palm));
+                    const fingersOpen = distances.filter(d => d > 0.12).length;
+                    const isFist = fingersOpen === 0;
+
+                    // Fist = clear canvas (only trigger once per fist gesture)
+                    if (isFist && !wasFist) {
+                        clearCanvas();
+                        statusDiv.textContent = '🗑️ Fist detected - canvas cleared!';
+                        statusDiv.className = 'status success';
+                    }
+                    wasFist = isFist;
+
+                    const px = (1 - indexTip.x) * inkCanvas.width;
+                    const py = indexTip.y * inkCanvas.height;
+
+                    // Draw the live finger cursor
+                    cursorCtx.beginPath();
+                    cursorCtx.arc(px, py, pinching ? 8 : 10, 0, Math.PI * 2);
+                    cursorCtx.fillStyle = pinching ? currentColor : 'rgba(255,255,255,0.5)';
+                    cursorCtx.fill();
+                    cursorCtx.strokeStyle = '#fff';
+                    cursorCtx.lineWidth = 2;
+                    cursorCtx.stroke();
+
+                    if (pinching && !isFist) {
+                        if (!isPinching) {
+                            // pen just went down - start a new stroke
+                            currentStroke = { color: currentColor, points: [{ x: px, y: py }] };
+                            strokes.push(currentStroke);
+                            lastPoint = { x: px, y: py };
+                        } else if (currentStroke) {
+                            currentStroke.points.push({ x: px, y: py });
+                            inkCtx.strokeStyle = currentStroke.color;
+                            inkCtx.lineWidth = 4;
+                            inkCtx.lineCap = 'round';
+                            inkCtx.lineJoin = 'round';
+                            inkCtx.beginPath();
+                            inkCtx.moveTo(lastPoint.x, lastPoint.y);
+                            inkCtx.lineTo(px, py);
+                            inkCtx.stroke();
+                            lastPoint = { x: px, y: py };
+                        }
+                        isPinching = true;
+                        penStateDiv.textContent = '✍️ Down';
+                    } else {
+                        isPinching = false;
+                        currentStroke = null;
+                        lastPoint = null;
+                        penStateDiv.textContent = '✋ Up';
+                    }
+                } else {
+                    isPinching = false;
+                    currentStroke = null;
+                    lastPoint = null;
+                    penStateDiv.textContent = '✋ Up';
+                }
+
+                frameCount++;
+                const now = Date.now();
+                if (now - lastFrameTime > 1000) {
+                    fpsDiv.textContent = frameCount;
+                    frameCount = 0;
+                    lastFrameTime = now;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+
+            requestAnimationFrame(detectHands);
+        }
+
+        function redrawAll() {
+            inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+            strokes.forEach(stroke => {
+                if (stroke.points.length < 2) return;
+                inkCtx.strokeStyle = stroke.color;
+                inkCtx.lineWidth = 4;
+                inkCtx.lineCap = 'round';
+                inkCtx.lineJoin = 'round';
+                inkCtx.beginPath();
+                inkCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    inkCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                }
+                inkCtx.stroke();
+            });
+        }
+
+        function clearCanvas() {
+            strokes = [];
+            currentStroke = null;
+            lastPoint = null;
+            redrawAll();
+        }
+
+        function undoStroke() {
+            strokes.pop();
+            redrawAll();
+        }
+
+        function changeColor() {
+            colorIndex = (colorIndex + 1) % colors.length;
+            currentColor = colors[colorIndex];
+            statusDiv.textContent = `🎨 Pen color changed!`;
+            statusDiv.className = 'status success';
+        }
+
+        resizeCanvases();
+    </script>
+</body>
+</html>
